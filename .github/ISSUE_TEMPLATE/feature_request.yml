@@ -1,0 +1,25 @@
+name: Design proposal
+description: Propose a provider, artifact, agent contract, quality gate, or workflow improvement.
+title: "[Design]: "
+labels:
+  - enhancement
+
+body:
+  - type: textarea
+    attributes:
+      label: Problem
+      description: What failure mode or missing capability should be addressed?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed contract
+      description: Describe inputs, outputs, evidence, warnings, and failure behavior.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Alternatives
+      description: List other approaches and their trade-offs.
+    validations:
+      required: false

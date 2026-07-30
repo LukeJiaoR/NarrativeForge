@@ -1,0 +1,38 @@
+name: Bug report
+description: Report a reproducible workflow, provider, timing, retrieval, or rendering defect.
+title: "[Bug]: "
+labels:
+  - bug
+
+body:
+  - type: textarea
+    attributes:
+      label: Observed behavior
+      description: Describe what happened and which workflow stage produced it.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+      description: Describe the expected artifact or state transition.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction
+      description: Include minimal steps, sanitized parameters, and relevant artifact paths.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Evidence
+      description: Add sanitized logs, task metadata, screenshots, or media timestamps. Never include API keys.
+    validations:
+      required: false
+  - type: input
+    attributes:
+      label: Environment
+      description: Operating system, Python version, commit, and execution surface.
+      placeholder: macOS 15, Python 3.11, commit abc123, CLI
+    validations:
+      required: true
