@@ -88,7 +88,7 @@ _CONTEXT_PHRASES = (
     "factory",
     "farm",
     "gym",
-}
+)
 
 _LOCATION_FAMILIES = {
     "store": {"store", "shop", "market", "supermarket", "grocery", "retail", "mall"},
@@ -294,7 +294,9 @@ def _round_robin_candidates(
             added = True
             if len(result) >= limit:
                 break
-        if not added and all(candidate_index >= len(items) - 1 for items in candidate_lists):
+        if not added and all(
+            candidate_index >= len(items) - 1 for items in candidate_lists
+        ):
             break
         candidate_index += 1
     global_urls.update(local_urls)
@@ -380,7 +382,9 @@ def install(material_module) -> None:
                 )
                 accepted = []
                 for result_rank, item in enumerate(video_items):
-                    source = item.source_info if isinstance(item.source_info, dict) else {}
+                    source = (
+                        item.source_info if isinstance(item.source_info, dict) else {}
+                    )
                     source_page = source.get("source_page")
                     relevance_score = metadata_relevance_score(
                         source_page,
@@ -453,7 +457,9 @@ def install(material_module) -> None:
                 has_candidate = True
                 item = term_items[candidate_index]
                 try:
-                    source = item.source_info if isinstance(item.source_info, dict) else {}
+                    source = (
+                        item.source_info if isinstance(item.source_info, dict) else {}
+                    )
                     logger.info(
                         "downloading reranked ordered stock video: "
                         f"intent={visual_intent!r}, query={source.get('query_variant')!r}, "
@@ -468,7 +474,9 @@ def install(material_module) -> None:
                         video_paths.append(saved_video_path)
                         try:
                             material_sources.append(
-                                source_record_with_retrieval_trace(item, saved_video_path)
+                                source_record_with_retrieval_trace(
+                                    item, saved_video_path
+                                )
                             )
                         except Exception as source_error:
                             logger.warning(
