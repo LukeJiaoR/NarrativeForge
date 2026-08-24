@@ -179,8 +179,8 @@ def build_search_variants(search_term: str, shared_context: str = "") -> list[st
     """Return up to three ordered queries for one visual intent.
 
     Priority is: context-anchored query, original query, noun-focused fallback.
-    The anchored query is intentionally first because preserving the scene is more
-    important for mixcut quality than matching a generic action perfectly.
+    Lower-priority queries are now true fallbacks: the downloader only searches them
+    when higher-priority tiers did not fill the candidate budget for the intent.
     """
     original = " ".join(_words(search_term))
     if not original:
@@ -271,38 +271,6 @@ def is_obvious_metadata_mismatch(
     return score is not None and score < -0.25
 
 
-def _round_robin_candidates(
-    candidate_lists: list[list],
-    *,
-    global_urls: set[str],
-    limit: int = _MAX_CANDIDATES_PER_INTENT,
-) -> list:
-    """Interleave provider-ranked results so one query variant cannot dominate."""
-    result = []
-    local_urls: set[str] = set()
-    candidate_index = 0
-    while len(result) < limit:
-        added = False
-        for candidates in candidate_lists:
-            if candidate_index >= len(candidates):
-                continue
-            item = candidates[candidate_index]
-            if item.url in local_urls or item.url in global_urls:
-                continue
-            local_urls.add(item.url)
-            result.append(item)
-            added = True
-            if len(result) >= limit:
-                break
-        if not added and all(
-            candidate_index >= len(items) - 1 for items in candidate_lists
-        ):
-            break
-        candidate_index += 1
-    global_urls.update(local_urls)
-    return result
-
-
 def install(material_module) -> None:
     """Install the ordered-retrieval MVP into ``app.services.material``.
 
@@ -369,9 +337,19 @@ def install(material_module) -> None:
             logger.info(
                 f"visual intent {visual_intent!r} expanded to queries: {query_variants}"
             )
-            variant_candidates: list[list] = []
+            intent_items = []
+            intent_urls: set[str] = set()
 
             for query_rank, query_variant in enumerate(query_variants):
+                if len(intent_items) >= _MAX_CANDIDATES_PER_INTENT:
+                    logger.info(
+                        "higher-priority query tier satisfied visual intent; "
+                        f"intent={visual_intent!r}, "
+                        f"selected={len(intent_items)}, "
+                        f"skipped_fallbacks={query_variants[query_rank:]}"
+                    )
+                    break
+
                 video_items = search_videos(
                     search_term=query_variant,
                     minimum_duration=max_clip_duration,
@@ -413,12 +391,25 @@ def install(material_module) -> None:
                         source["metadata_relevance_score"] = relevance_score
                     item.source_info = source
                     accepted.append(item)
-                variant_candidates.append(accepted)
 
-            intent_items = _round_robin_candidates(
-                variant_candidates,
-                global_urls=valid_video_urls,
-            )
+                added_from_tier = 0
+                for item in accepted:
+                    if len(intent_items) >= _MAX_CANDIDATES_PER_INTENT:
+                        break
+                    if item.url in intent_urls or item.url in valid_video_urls:
+                        continue
+                    intent_urls.add(item.url)
+                    intent_items.append(item)
+                    added_from_tier += 1
+
+                logger.info(
+                    "mixcut query tier accepted candidates: "
+                    f"intent={visual_intent!r}, query={query_variant!r}, "
+                    f"query_rank={query_rank}, added={added_from_tier}, "
+                    f"selected={len(intent_items)}/{_MAX_CANDIDATES_PER_INTENT}"
+                )
+
+            valid_video_urls.update(intent_urls)
             if intent_items:
                 candidate_groups.append((visual_intent, intent_items))
                 found_duration += sum(item.duration for item in intent_items)
