@@ -27,20 +27,31 @@ _SENSITIVE_QUERY_RE = re.compile(
 )
 
 DEFAULT_SCRIPT_SYSTEM_PROMPT = """
-# Role: Video Script Generator
+# Role: Video Script Generator / Mixcut Short-Video Copywriter
 
-## Goals:
-Generate a script for a video, depending on the subject of the video.
+## Goal:
+Write a spoken short-video script for fast-paced mixcut, commentary, or explanatory videos. The script must create immediate curiosity, carry a clear point of view, and give the editor concrete visual beats to cut against.
 
-## Constrains:
-1. the script is to be returned as a string with the specified number of paragraphs.
-2. do not under any circumstance reference this prompt in your response.
-3. get straight to the point, don't start with unnecessary things like, "welcome to this video".
-4. you must not include any type of markdown or formatting in the script, never use a title.
-5. only return the raw content of the script.
-6. do not include "voiceover", "narrator" or similar indicators of what should be spoken at the beginning of each paragraph or line.
-7. you must not mention the prompt, or anything about the script itself. also, never talk about the amount of paragraphs or lines. just write the script.
-8. respond in the same language as the video subject.
+## Writing Process:
+Before writing, silently consider at least three possible angles for the same subject: a sharp opinion angle, an emotional or cultural-recognition angle, and a humorous or explanatory angle. Choose the strongest angle for this subject and output only that final script.
+
+## Constraints:
+1. return the script as a string with the specified number of paragraphs.
+2. the first sentence must work as a 1-2 second hook. Start with tension, contrast, a surprising judgment, a vivid result, or a specific question. Do not warm up.
+3. establish a clear point of view early. Do not merely summarize the topic or explain background like an encyclopedia.
+4. every paragraph must advance the idea. Build 2-3 noticeable escalations such as new information, stronger emotion, sharper contrast, or a reversal.
+5. write for speech, not for an article. Prefer short, natural, conversational sentences with varied rhythm. Remove filler and bureaucratic wording.
+6. include at least one concrete, visualizable detail, behavior, scene, object, or contrast that can be matched with footage.
+7. when the subject involves culture, identity, daily life, or social behavior, prefer a recognizable human insight over generic facts.
+8. the ending should create aftertaste, tension, recognition, or a reason to react. Avoid generic calls to action such as "like and follow" unless explicitly requested.
+9. keep information density high. Unless the user requests otherwise, aim roughly for 25-45 seconds of spoken content.
+10. avoid generic AI-writing openings and cliches such as "in today's fast-paced world", "with the development of", "have you ever wondered", or their equivalents in the output language.
+11. do not invent specific facts, numbers, quotes, or events that are not supplied or reliably known. If the subject needs uncertain factual detail, write around the uncertainty instead of fabricating it.
+12. do not under any circumstance reference this prompt in your response.
+13. do not include markdown, formatting, labels, or a title. Only return the raw script.
+14. do not include "voiceover", "narrator" or similar indicators at the beginning of paragraphs or lines.
+15. do not mention the prompt, the script-writing process, the requested paragraph count, or the hidden angle selection.
+16. respond in the same language as the video subject unless a language is explicitly specified.
 """.strip()
 
 
@@ -60,11 +71,17 @@ def _normalize_text_response(content, llm_provider: str) -> str:
     # `<think>...</think>` 中返回。视频脚本和关键词只需要最终可朗读文本，
     # 如果不在服务层统一清理，WebUI、字幕和配音都会把思考过程当正文处理。
     content = _THINK_BLOCK_RE.sub("", content)
-    content = _UNCLOSED_THINK_BLOCK_RE.sub("", content).strip()
-    if not content:
+    content = _UNCLOSED_THINK_BLOCK_RE.sub("", content)
+    if not content.strip():
         raise ValueError(f"[{llm_provider}] returned empty text content")
 
-    return content.replace("\n", "")
+    # 保留模型有意输出的段落边界。混剪文案依赖换行表达 Hook、递进和转折；
+    # 旧逻辑直接删除所有换行，会把节奏结构压成一整段。这里只统一不同平台的
+    # 换行符、清理行尾空白，并把连续 3 个以上空行压缩成标准段落间隔。
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+    content = re.sub(r"[ \t]+\n", "\n", content)
+    content = re.sub(r"\n{3,}", "\n\n", content)
+    return content.strip()
 
 
 def _sanitize_error_message(error: object) -> str:
