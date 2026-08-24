@@ -71,7 +71,7 @@ class TestMaterialRetrievalIntegration(unittest.TestCase):
             },
         )
 
-    def test_installed_downloader_searches_context_anchored_variants(self):
+    def _fake_material(self):
         baseline = Mock(return_value=["baseline.mp4"])
         persisted = []
         saved_urls = []
@@ -87,7 +87,10 @@ class TestMaterialRetrievalIntegration(unittest.TestCase):
             _redact_request_error=lambda error, *secrets: str(error),
         )
         material_retrieval.install(fake_material)
+        return fake_material, baseline, persisted, saved_urls
 
+    def test_installed_downloader_searches_context_anchored_variants(self):
+        fake_material, baseline, persisted, saved_urls = self._fake_material()
         search_calls = []
 
         def search_videos(search_term, minimum_duration, video_aspect):
@@ -126,6 +129,45 @@ class TestMaterialRetrievalIntegration(unittest.TestCase):
         self.assertNotIn("https://cdn.example/bad.mp4", saved_urls)
         self.assertEqual(result, ["/tmp/1.mp4"])
         self.assertEqual(persisted[0]["visual_intent"], "customer choosing hot food")
+        self.assertEqual(persisted[0]["query_variant"], "convenience store hot food")
+        baseline.assert_not_called()
+
+    def test_full_anchored_tier_skips_lower_priority_queries(self):
+        fake_material, baseline, persisted, saved_urls = self._fake_material()
+        search_calls = []
+
+        def search_videos(search_term, minimum_duration, video_aspect):
+            search_calls.append(search_term)
+            if search_term == "convenience store hot food":
+                return [
+                    self._item(
+                        f"https://cdn.example/hot-food-{index}.mp4",
+                        f"https://www.pexels.com/video/customer-buying-hot-food-in-store-{index}/",
+                        f"hot-food-{index}",
+                    )
+                    for index in range(8)
+                ]
+            return []
+
+        result = fake_material._download_videos_by_script_order(
+            task_id="task-tier-priority",
+            search_terms=[
+                "customer entering convenience store",
+                "organized convenience store shelves",
+                "customer choosing hot food",
+            ],
+            search_videos=search_videos,
+            video_aspect="9:16",
+            audio_duration=2,
+            max_clip_duration=3,
+            material_directory="/tmp",
+        )
+
+        self.assertIn("convenience store hot food", search_calls)
+        self.assertNotIn("customer choosing hot food", search_calls)
+        self.assertNotIn("hot food", search_calls)
+        self.assertEqual(result, ["/tmp/1.mp4"])
+        self.assertEqual(len(saved_urls), 1)
         self.assertEqual(persisted[0]["query_variant"], "convenience store hot food")
         baseline.assert_not_called()
 
